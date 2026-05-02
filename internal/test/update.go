@@ -8,11 +8,12 @@ import (
 	"os/exec"
 )
 
-func Update(root string, out io.Writer) error {
+func Update(root, filter string, out io.Writer) error {
 	cases, err := Discover(root)
 	if err != nil {
 		return err
 	}
+	cases = applyFilter(cases, filter)
 
 	if len(cases) == 0 {
 		fmt.Fprintln(out, "no test cases found")

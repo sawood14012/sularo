@@ -12,6 +12,7 @@ import (
 func main() {
 	var verbose bool
 	var outputFormat string
+	var filter string
 
 	root := &cobra.Command{
 		Use:   "sularo",
@@ -22,7 +23,7 @@ func main() {
 		Use:   "test",
 		Short: "Run composition render tests under ./tests/",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			results, err := test.Run("./tests")
+			results, err := test.Run("./tests", filter)
 			if err != nil {
 				return err
 			}
@@ -50,16 +51,18 @@ func main() {
 	}
 	testCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 	testCmd.Flags().StringVar(&outputFormat, "format", "tap", "Output format: tap, junit, json")
+	testCmd.Flags().StringVar(&filter, "filter", "", "Run only test cases whose name contains this substring")
 
 	updateCmd := &cobra.Command{
 		Use:   "update",
 		Short: "Re-run render and overwrite expected.yaml for each test case",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return test.Update("./tests", os.Stdout)
+			return test.Update("./tests", filter, os.Stdout)
 		},
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	updateCmd.Flags().StringVar(&filter, "filter", "", "Update only test cases whose name contains this substring")
 
 	root.AddCommand(testCmd, updateCmd)
 
