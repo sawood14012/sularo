@@ -32,6 +32,7 @@ jobs:
         uses: cycjimmy/semantic-release-action@v4
         with:
           extra_plugins: |
+            conventional-changelog-conventionalcommits
             @semantic-release/commit-analyzer
             @semantic-release/release-notes-generator
             @semantic-release/github
