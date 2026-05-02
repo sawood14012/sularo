@@ -39,11 +39,48 @@ func Discover(root string) ([]Case, error) {
 			continue
 		}
 		dir := filepath.Join(root, e.Name())
-		xrPath := filepath.Join(dir, "xr.yaml")
+		dirCases, err := discoverDir(e.Name(), dir)
+		if err != nil {
+			return nil, err
+		}
+		cases = append(cases, dirCases...)
+	}
+
+	sort.Slice(cases, func(i, j int) bool { return cases[i].Name < cases[j].Name })
+	return cases, nil
+}
+
+// discoverDir finds all xr*.yaml files in dir and produces one Case per file.
+// xr.yaml → name is dirName (backwards-compat).
+// xr-<suffix>.yaml → name is dirName/suffix.
+// expected file mirrors the xr filename: xr-suffix.yaml → expected-suffix.yaml.
+func discoverDir(dirName, dir string) ([]Case, error) {
+	xrFiles, err := filepath.Glob(filepath.Join(dir, "xr*.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	if len(xrFiles) == 0 {
+		return nil, nil
+	}
+
+	var cases []Case
+	for _, xrPath := range xrFiles {
+		base := filepath.Base(xrPath) // e.g. "xr.yaml" or "xr-with-subnets.yaml"
+
+		var caseName, expectedFile string
+		if base == "xr.yaml" {
+			caseName = dirName
+			expectedFile = "expected.yaml"
+		} else {
+			// xr-<suffix>.yaml → suffix
+			suffix := strings.TrimSuffix(strings.TrimPrefix(base, "xr-"), ".yaml")
+			caseName = dirName + "/" + suffix
+			expectedFile = "expected-" + suffix + ".yaml"
+		}
 
 		annotations, err := xrAnnotations(xrPath)
 		if err != nil {
-			return nil, fmt.Errorf("test %s: %w", e.Name(), err)
+			return nil, fmt.Errorf("test %s: %w", caseName, err)
 		}
 
 		skip := annotations[skipAnnotation] == "true"
@@ -52,23 +89,21 @@ func Discover(root string) ([]Case, error) {
 		if !skip {
 			compositionPath, err = resolveComposition(dir, annotations)
 			if err != nil {
-				return nil, fmt.Errorf("test %s: %w", e.Name(), err)
+				return nil, fmt.Errorf("test %s: %w", caseName, err)
 			}
 			functionsPath = resolveFunctions(dir, annotations)
 		}
 
 		cases = append(cases, Case{
-			Name:        e.Name(),
+			Name:        caseName,
 			Dir:         dir,
 			Composition: compositionPath,
 			XR:          xrPath,
 			Functions:   functionsPath,
-			Expected:    filepath.Join(dir, "expected.yaml"),
+			Expected:    filepath.Join(dir, expectedFile),
 			Skip:        skip,
 		})
 	}
-
-	sort.Slice(cases, func(i, j int) bool { return cases[i].Name < cases[j].Name })
 	return cases, nil
 }
 

@@ -1,0 +1,9 @@
+apiVersion: example.org/v1alpha1
+kind: XVPC
+metadata:
+  name: example-private
+  annotations:
+    sularo.crossplane.io/composition: compositions/example-vpc.yaml
+    sularo.crossplane.io/functions: functions/patch-and-transform.yaml
+spec:
+  region: eu-west-1
