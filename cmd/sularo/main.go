@@ -48,11 +48,20 @@ func main() {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-
 	testCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 	testCmd.Flags().StringVar(&outputFormat, "format", "tap", "Output format: tap, junit, json")
 
-	root.AddCommand(testCmd)
+	updateCmd := &cobra.Command{
+		Use:   "update",
+		Short: "Re-run render and overwrite expected.yaml for each test case",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return test.Update("./tests", os.Stdout)
+		},
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+
+	root.AddCommand(testCmd, updateCmd)
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
