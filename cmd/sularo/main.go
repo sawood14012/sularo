@@ -9,14 +9,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Set via ldflags by goreleaser: -X main.version=v1.2.3
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
 	var verbose bool
 	var outputFormat string
 	var filter string
 
 	root := &cobra.Command{
-		Use:   "sularo",
-		Short: "sularo is a tiny test harness for Crossplane compositions",
+		Use:     "sularo",
+		Short:   "sularo is a tiny test harness for Crossplane compositions",
+		Version: fmt.Sprintf("%s (commit %s, built %s)", version, commit, date),
 	}
 
 	testCmd := &cobra.Command{
