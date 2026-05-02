@@ -4,5 +4,6 @@ metadata:
   name: example
   annotations:
     sularo.crossplane.io/composition: compositions/example-vpc.yaml
+    sularo.crossplane.io/functions: functions/patch-and-transform.yaml
 spec:
   region: us-east-1

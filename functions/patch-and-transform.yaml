@@ -1,0 +1,11 @@
+apiVersion: pkg.crossplane.io/v1beta1
+kind: FunctionRuntime
+metadata:
+  name: function-patch-and-transform
+spec:
+  type: Development
+  deployment:
+    spec:
+      selector:
+        matchLabels:
+          pkg.crossplane.io/revision: function-patch-and-transform

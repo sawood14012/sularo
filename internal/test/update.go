@@ -50,13 +50,23 @@ func Update(root, filter string, out io.Writer) error {
 }
 
 func render(c Case) ([]byte, error) {
-	for _, p := range []string{c.Composition, c.XR} {
+	required := []string{c.XR, c.Composition}
+	for _, p := range required {
 		if _, err := os.Stat(p); err != nil {
 			return nil, fmt.Errorf("missing file: %s", p)
 		}
 	}
 
-	cmd := exec.Command("crossplane", "render", c.Composition, c.XR)
+	// crossplane render <xr> <composition> [--function-runtime-configs <functions>]
+	args := []string{"render", c.XR, c.Composition}
+	if c.Functions != "" {
+		if _, err := os.Stat(c.Functions); err != nil {
+			return nil, fmt.Errorf("missing functions file: %s", c.Functions)
+		}
+		args = append(args, "--function-runtime-configs", c.Functions)
+	}
+
+	cmd := exec.Command("crossplane", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
