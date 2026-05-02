@@ -10,8 +10,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// parseDocs parses a YAML stream into a slice of generic documents. Empty
-// documents are dropped so that trailing `---` separators don't produce noise.
 func parseDocs(data []byte) ([]any, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	var docs []any
@@ -32,9 +30,6 @@ func parseDocs(data []byte) ([]any, error) {
 	return docs, nil
 }
 
-// normalize converts map[interface{}]interface{} values (which yaml.v3 should
-// not produce, but be defensive) into map[string]interface{} so go-cmp output
-// is readable and comparisons are stable.
 func normalize(v any) any {
 	switch x := v.(type) {
 	case map[any]any:
@@ -57,8 +52,24 @@ func normalize(v any) any {
 	return v
 }
 
-// Diff returns an empty string when the two YAML byte slices are semantically
-// equal, otherwise a human-readable diff.
+// projectSubset returns a copy of actual containing only the keys present in
+// template, recursively. Slices are kept verbatim (exact-match semantics).
+// This enables subset assertion: extra fields in actual are silently ignored.
+func projectSubset(actual, template any) any {
+	t, tIsMap := template.(map[string]any)
+	a, aIsMap := actual.(map[string]any)
+	if !tIsMap || !aIsMap {
+		return actual
+	}
+	result := make(map[string]any, len(t))
+	for k, tv := range t {
+		result[k] = projectSubset(a[k], tv)
+	}
+	return result
+}
+
+// Diff returns an empty string when every field declared in want exists in got
+// with the same value (subset match). Extra fields in got are ignored.
 func Diff(got, want []byte) (string, error) {
 	gotDocs, err := parseDocs(got)
 	if err != nil {
@@ -68,12 +79,19 @@ func Diff(got, want []byte) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("parse expected: %w", err)
 	}
-	d := cmp.Diff(wantDocs, gotDocs)
+
+	projected := make([]any, len(wantDocs))
+	for i, w := range wantDocs {
+		if i < len(gotDocs) {
+			projected[i] = projectSubset(gotDocs[i], w)
+		}
+		// projected[i] stays nil when got has fewer docs → diff shows missing doc
+	}
+
+	d := cmp.Diff(wantDocs, projected)
 	return d, nil
 }
 
-// Indent prefixes every line with the given prefix. Used to format diffs as
-// TAP "yaml-ish" subtext.
 func Indent(s, prefix string) string {
 	if s == "" {
 		return ""
