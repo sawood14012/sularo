@@ -64,7 +64,29 @@ func main() {
 	}
 	updateCmd.Flags().StringVar(&filter, "filter", "", "Update only test cases whose name contains this substring")
 
-	root.AddCommand(testCmd, updateCmd)
+	var initXR, initComposition, initFunctions string
+	initCmd := &cobra.Command{
+		Use:   "init <name>",
+		Short: "Scaffold a new test case under ./tests/",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return test.Init(test.InitOptions{
+				Name:        args[0],
+				XRSource:    initXR,
+				Composition: initComposition,
+				Functions:   initFunctions,
+			})
+		},
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+	initCmd.Flags().StringVar(&initXR, "xr", "", "Path to source XR file (required)")
+	initCmd.Flags().StringVar(&initComposition, "composition", "", "Repo-relative path to composition (required)")
+	initCmd.Flags().StringVar(&initFunctions, "functions", "", "Repo-relative path to functions file (optional)")
+	_ = initCmd.MarkFlagRequired("xr")
+	_ = initCmd.MarkFlagRequired("composition")
+
+	root.AddCommand(testCmd, updateCmd, initCmd)
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
