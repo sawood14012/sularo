@@ -23,10 +23,7 @@ func main() {
 		Use:   "test",
 		Short: "Run composition render tests under ./tests/",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			results, err := test.Run("./tests", filter)
-			if err != nil {
-				return err
-			}
+			watch, _ := cmd.Flags().GetBool("watch")
 
 			var f format.Formatter
 			switch outputFormat {
@@ -36,6 +33,25 @@ func main() {
 				f = format.JSON{}
 			default:
 				f = format.TAP{Verbose: verbose}
+			}
+
+			if watch {
+				return test.Watch(func(changedFile string) {
+					if changedFile != "" {
+						fmt.Fprintf(os.Stdout, "changed: %s\n\n", changedFile)
+					}
+					results, err := test.Run("./tests", filter)
+					if err != nil {
+						fmt.Fprintf(os.Stdout, "error: %v\n", err)
+						return
+					}
+					f.Write(os.Stdout, results)
+				}, os.Stdout)
+			}
+
+			results, err := test.Run("./tests", filter)
+			if err != nil {
+				return err
 			}
 			f.Write(os.Stdout, results)
 
@@ -52,6 +68,7 @@ func main() {
 	testCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 	testCmd.Flags().StringVar(&outputFormat, "format", "tap", "Output format: tap, junit, json")
 	testCmd.Flags().StringVar(&filter, "filter", "", "Run only test cases whose name contains this substring")
+	testCmd.Flags().Bool("watch", false, "Re-run tests on file changes")
 
 	updateCmd := &cobra.Command{
 		Use:   "update",
