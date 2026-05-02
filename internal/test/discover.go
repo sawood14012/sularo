@@ -13,6 +13,7 @@ import (
 
 const (
 	compositionAnnotation = "sularo.crossplane.io/composition"
+	functionsAnnotation   = "sularo.crossplane.io/functions"
 	skipAnnotation        = "sularo.crossplane.io/skip"
 )
 
@@ -21,6 +22,7 @@ type Case struct {
 	Dir         string
 	Composition string
 	XR          string
+	Functions   string // optional; empty means no functions file
 	Expected    string
 	Skip        bool
 }
@@ -46,12 +48,13 @@ func Discover(root string) ([]Case, error) {
 
 		skip := annotations[skipAnnotation] == "true"
 
-		var compositionPath string
+		var compositionPath, functionsPath string
 		if !skip {
 			compositionPath, err = resolveComposition(dir, annotations)
 			if err != nil {
 				return nil, fmt.Errorf("test %s: %w", e.Name(), err)
 			}
+			functionsPath = resolveFunctions(dir, annotations)
 		}
 
 		cases = append(cases, Case{
@@ -59,6 +62,7 @@ func Discover(root string) ([]Case, error) {
 			Dir:         dir,
 			Composition: compositionPath,
 			XR:          xrPath,
+			Functions:   functionsPath,
 			Expected:    filepath.Join(dir, "expected.yaml"),
 			Skip:        skip,
 		})
@@ -69,13 +73,11 @@ func Discover(root string) ([]Case, error) {
 }
 
 func resolveComposition(dir string, annotations map[string]string) (string, error) {
-	// Local composition.yaml takes precedence.
 	local := filepath.Join(dir, "composition.yaml")
 	if _, err := os.Stat(local); err == nil {
 		return local, nil
 	}
 
-	// Fall back to annotation pointing at a repo-relative path.
 	if p := annotations[compositionAnnotation]; p != "" {
 		if filepath.IsAbs(p) {
 			return p, nil
@@ -87,6 +89,25 @@ func resolveComposition(dir string, annotations map[string]string) (string, erro
 		"no composition found: add composition.yaml to the test dir or set annotation %q on the XR",
 		compositionAnnotation,
 	)
+}
+
+// resolveFunctions returns the functions file path, or empty string if none is
+// configured. Functions are optional — compositions that don't use a pipeline
+// don't need them.
+func resolveFunctions(dir string, annotations map[string]string) string {
+	local := filepath.Join(dir, "functions.yaml")
+	if _, err := os.Stat(local); err == nil {
+		return local
+	}
+
+	if p := annotations[functionsAnnotation]; p != "" {
+		if filepath.IsAbs(p) {
+			return p
+		}
+		return filepath.Clean(p)
+	}
+
+	return ""
 }
 
 func xrAnnotations(xrPath string) (map[string]string, error) {
