@@ -5,11 +5,13 @@ import (
 	"os"
 
 	"github.com/sawood14012/sularo/internal/test"
+	"github.com/sawood14012/sularo/internal/test/format"
 	"github.com/spf13/cobra"
 )
 
 func main() {
 	var verbose bool
+	var outputFormat string
 
 	root := &cobra.Command{
 		Use:   "sularo",
@@ -20,12 +22,35 @@ func main() {
 		Use:   "test",
 		Short: "Run composition render tests under ./tests/",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return test.Run("./tests", verbose, os.Stdout)
+			results, err := test.Run("./tests")
+			if err != nil {
+				return err
+			}
+
+			var f format.Formatter
+			switch outputFormat {
+			case "junit":
+				f = format.JUnit{}
+			case "json":
+				f = format.JSON{}
+			default:
+				f = format.TAP{Verbose: verbose}
+			}
+			f.Write(os.Stdout, results)
+
+			for _, r := range results {
+				if r.Status == test.StatusFail {
+					return fmt.Errorf("tests failed")
+				}
+			}
+			return nil
 		},
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+
 	testCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
+	testCmd.Flags().StringVar(&outputFormat, "format", "tap", "Output format: tap, junit, json")
 
 	root.AddCommand(testCmd)
 

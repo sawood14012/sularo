@@ -10,7 +10,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const compositionAnnotation = "sularo.crossplane.io/composition"
+const (
+	compositionAnnotation = "sularo.crossplane.io/composition"
+	skipAnnotation        = "sularo.crossplane.io/skip"
+)
 
 type Case struct {
 	Name        string
@@ -18,6 +21,7 @@ type Case struct {
 	Composition string
 	XR          string
 	Expected    string
+	Skip        bool
 }
 
 func Discover(root string) ([]Case, error) {
@@ -34,9 +38,19 @@ func Discover(root string) ([]Case, error) {
 		dir := filepath.Join(root, e.Name())
 		xrPath := filepath.Join(dir, "xr.yaml")
 
-		compositionPath, err := resolveComposition(dir, xrPath)
+		annotations, err := xrAnnotations(xrPath)
 		if err != nil {
 			return nil, fmt.Errorf("test %s: %w", e.Name(), err)
+		}
+
+		skip := annotations[skipAnnotation] == "true"
+
+		var compositionPath string
+		if !skip {
+			compositionPath, err = resolveComposition(dir, annotations)
+			if err != nil {
+				return nil, fmt.Errorf("test %s: %w", e.Name(), err)
+			}
 		}
 
 		cases = append(cases, Case{
@@ -45,6 +59,7 @@ func Discover(root string) ([]Case, error) {
 			Composition: compositionPath,
 			XR:          xrPath,
 			Expected:    filepath.Join(dir, "expected.yaml"),
+			Skip:        skip,
 		})
 	}
 
@@ -52,57 +67,50 @@ func Discover(root string) ([]Case, error) {
 	return cases, nil
 }
 
-// resolveComposition returns the composition path for a test case.
-// It first checks for a local composition.yaml in the test dir, then
-// falls back to the sularo.crossplane.io/composition annotation on the XR.
-func resolveComposition(dir, xrPath string) (string, error) {
+func resolveComposition(dir string, annotations map[string]string) (string, error) {
+	// Local composition.yaml takes precedence.
 	local := filepath.Join(dir, "composition.yaml")
 	if _, err := os.Stat(local); err == nil {
 		return local, nil
 	}
 
-	annotated, err := compositionFromAnnotation(xrPath)
-	if err != nil {
-		return "", err
-	}
-	if annotated != "" {
-		if filepath.IsAbs(annotated) {
-			return annotated, nil
+	// Fall back to annotation pointing at a repo-relative path.
+	if p := annotations[compositionAnnotation]; p != "" {
+		if filepath.IsAbs(p) {
+			return p, nil
 		}
-		// Relative paths are resolved from the repo root (cwd), not the test dir.
-		return filepath.Clean(annotated), nil
+		return filepath.Clean(p), nil
 	}
 
 	return "", fmt.Errorf(
-		"no composition found: add a composition.yaml to the test dir or set annotation %q on the XR",
+		"no composition found: add composition.yaml to the test dir or set annotation %q on the XR",
 		compositionAnnotation,
 	)
 }
 
-func compositionFromAnnotation(xrPath string) (string, error) {
+func xrAnnotations(xrPath string) (map[string]string, error) {
 	f, err := os.Open(xrPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", nil
+			return nil, nil
 		}
-		return "", fmt.Errorf("open xr: %w", err)
+		return nil, fmt.Errorf("open xr: %w", err)
 	}
 	defer f.Close()
 
-	return extractAnnotation(f)
-}
-
-func extractAnnotation(r io.Reader) (string, error) {
 	var doc struct {
 		Metadata struct {
 			Annotations map[string]string `yaml:"annotations"`
 		} `yaml:"metadata"`
 	}
-	if err := yaml.NewDecoder(r).Decode(&doc); err != nil {
+	if err := yaml.NewDecoder(f).Decode(&doc); err != nil {
 		if err == io.EOF {
-			return "", nil
+			return nil, nil
 		}
-		return "", fmt.Errorf("parse xr: %w", err)
+		return nil, fmt.Errorf("parse xr: %w", err)
 	}
-	return doc.Metadata.Annotations[compositionAnnotation], nil
+	if doc.Metadata.Annotations == nil {
+		return map[string]string{}, nil
+	}
+	return doc.Metadata.Annotations, nil
 }

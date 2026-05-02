@@ -3,52 +3,34 @@ package test
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
+	"time"
 )
 
-func Run(root string, verbose bool, out io.Writer) error {
+func Run(root string) ([]Result, error) {
 	cases, err := Discover(root)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	if len(cases) == 0 {
-		fmt.Fprintln(out, "1..0 # no test cases found")
-		return nil
+	results := make([]Result, 0, len(cases))
+	for _, c := range cases {
+		results = append(results, runCase(c))
 	}
-
-	fmt.Fprintf(out, "1..%d\n", len(cases))
-
-	failed := 0
-	for i, c := range cases {
-		n := i + 1
-		ok, msg := runCase(c, verbose)
-		if ok {
-			fmt.Fprintf(out, "ok %d - %s\n", n, c.Name)
-			if verbose && msg != "" {
-				fmt.Fprintln(out, Indent(msg, "# "))
-			}
-		} else {
-			failed++
-			fmt.Fprintf(out, "not ok %d - %s\n", n, c.Name)
-			if msg != "" {
-				fmt.Fprintln(out, Indent(msg, "    "))
-			}
-		}
-	}
-
-	if failed > 0 {
-		return fmt.Errorf("%d/%d test(s) failed", failed, len(cases))
-	}
-	return nil
+	return results, nil
 }
 
-func runCase(c Case, verbose bool) (bool, string) {
+func runCase(c Case) Result {
+	if c.Skip {
+		return Result{Name: c.Name, Status: StatusSkip}
+	}
+
+	start := time.Now()
+
 	for _, p := range []string{c.Composition, c.XR, c.Expected} {
 		if _, err := os.Stat(p); err != nil {
-			return false, fmt.Sprintf("missing file: %s", p)
+			return Result{Name: c.Name, Status: StatusFail, Duration: time.Since(start),
+				Message: fmt.Sprintf("missing file: %s", p)}
 		}
 	}
 
@@ -57,20 +39,23 @@ func runCase(c Case, verbose bool) (bool, string) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return false, fmt.Sprintf("crossplane render failed: %v\n%s", err, stderr.String())
+		return Result{Name: c.Name, Status: StatusFail, Duration: time.Since(start),
+			Message: fmt.Sprintf("crossplane render failed: %v\n%s", err, stderr.String())}
 	}
 
 	expected, err := os.ReadFile(c.Expected)
 	if err != nil {
-		return false, fmt.Sprintf("read expected: %v", err)
+		return Result{Name: c.Name, Status: StatusFail, Duration: time.Since(start),
+			Message: fmt.Sprintf("read expected: %v", err)}
 	}
 
 	diff, err := Diff(stdout.Bytes(), expected)
 	if err != nil {
-		return false, err.Error()
+		return Result{Name: c.Name, Status: StatusFail, Duration: time.Since(start), Message: err.Error()}
 	}
 	if diff != "" {
-		return false, "--- expected\n+++ got\n" + diff
+		return Result{Name: c.Name, Status: StatusFail, Duration: time.Since(start),
+			Message: "--- expected\n+++ got\n" + diff}
 	}
-	return true, ""
+	return Result{Name: c.Name, Status: StatusPass, Duration: time.Since(start)}
 }
