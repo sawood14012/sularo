@@ -1,10 +1,8 @@
 package test
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"time"
 )
 
@@ -27,20 +25,9 @@ func runCase(c Case) Result {
 
 	start := time.Now()
 
-	for _, p := range []string{c.Composition, c.XR, c.Expected} {
-		if _, err := os.Stat(p); err != nil {
-			return Result{Name: c.Name, Status: StatusFail, Duration: time.Since(start),
-				Message: fmt.Sprintf("missing file: %s", p)}
-		}
-	}
-
-	cmd := exec.Command("crossplane", "render", c.Composition, c.XR)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return Result{Name: c.Name, Status: StatusFail, Duration: time.Since(start),
-			Message: fmt.Sprintf("crossplane render failed: %v\n%s", err, stderr.String())}
+	rendered, err := render(c)
+	if err != nil {
+		return Result{Name: c.Name, Status: StatusFail, Duration: time.Since(start), Message: err.Error()}
 	}
 
 	expected, err := os.ReadFile(c.Expected)
@@ -49,7 +36,7 @@ func runCase(c Case) Result {
 			Message: fmt.Sprintf("read expected: %v", err)}
 	}
 
-	diff, err := Diff(stdout.Bytes(), expected)
+	diff, err := Diff(rendered, expected)
 	if err != nil {
 		return Result{Name: c.Name, Status: StatusFail, Duration: time.Since(start), Message: err.Error()}
 	}
