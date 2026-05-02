@@ -1,0 +1,17 @@
+---
+apiVersion: example.org/v1alpha1
+kind: XVPC
+metadata:
+  name: example-private
+spec:
+  region: eu-west-1
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: VPC
+metadata:
+  labels:
+    crossplane.io/composite: example-private
+spec:
+  forProvider:
+    cidrBlock: 10.0.0.0/16
+    region: eu-west-1
