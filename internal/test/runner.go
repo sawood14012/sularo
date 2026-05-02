@@ -6,11 +6,12 @@ import (
 	"time"
 )
 
-func Run(root string) ([]Result, error) {
+func Run(root, filter string) ([]Result, error) {
 	cases, err := Discover(root)
 	if err != nil {
 		return nil, err
 	}
+	cases = applyFilter(cases, filter)
 	results := make([]Result, 0, len(cases))
 	for _, c := range cases {
 		results = append(results, runCase(c))

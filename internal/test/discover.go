@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -113,4 +114,19 @@ func xrAnnotations(xrPath string) (map[string]string, error) {
 		return map[string]string{}, nil
 	}
 	return doc.Metadata.Annotations, nil
+}
+
+// applyFilter returns cases whose name contains filter as a substring.
+// An empty filter returns all cases unchanged.
+func applyFilter(cases []Case, filter string) []Case {
+	if filter == "" {
+		return cases
+	}
+	var out []Case
+	for _, c := range cases {
+		if strings.Contains(c.Name, filter) {
+			out = append(out, c)
+		}
+	}
+	return out
 }
