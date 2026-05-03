@@ -33,8 +33,13 @@ func (r *Registry) Validate(resources []map[string]any) []string {
 			errs = append(errs, fmt.Sprintf("%s %s: marshal: %v", kind, name, err))
 			continue
 		}
+		var v any
+		if err := json.Unmarshal(b, &v); err != nil {
+			errs = append(errs, fmt.Sprintf("%s %s: unmarshal: %v", kind, name, err))
+			continue
+		}
 
-		if err := s.Validate(strings.NewReader(string(b))); err != nil {
+		if err := s.Validate(v); err != nil {
 			errs = append(errs, fmt.Sprintf("%s %s: %v", kind, name, err))
 		}
 	}

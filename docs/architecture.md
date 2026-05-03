@@ -34,7 +34,7 @@ Run(root, filter)
   ├─ schema.LoadDir("./crds")   → Registry
   ├─ Discover(root)             → []Case
   └─ for each Case:
-       ├─ crossplane render xr composition [--function-runtime-configs functions]
+       ├─ crossplane render xr composition [functions]
        ├─ Registry.Validate(rendered docs)   [skipped if registry empty]
        ├─ Diff(rendered, expected)           [subset match via projectSubset]
        └─ Result{Name, Status, Message, Duration}

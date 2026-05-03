@@ -52,7 +52,9 @@ cd sularo
 go build -o sularo ./cmd/sularo
 ```
 
-**Prerequisites:** the `crossplane` CLI must be on your `$PATH`. Install it from [docs.crossplane.io](https://docs.crossplane.io/latest/cli/).
+**Prerequisites:**
+- The `crossplane` CLI must be on your `$PATH`. Install it from [docs.crossplane.io](https://docs.crossplane.io/latest/cli/).
+- A container runtime is required to render compositions that use a function pipeline. Docker and Podman both work — sularo auto-detects a running Podman socket when Docker isn't present and sets `DOCKER_HOST` for the `crossplane render` subprocess. Set `DOCKER_HOST` explicitly to override.
 
 ---
 
@@ -298,7 +300,7 @@ If your composition uses a function pipeline, provide the function runtime confi
 1. **Local file** — `functions.yaml` inside the test directory.
 2. **Annotation** — `sularo.crossplane.io/functions: <path>` on the XR.
 
-If neither is present, sularo runs `crossplane render` without `--function-runtime-configs` (valid for non-pipeline compositions).
+If neither is present, sularo runs `crossplane render` with just the XR and composition (valid for non-pipeline compositions).
 
 ```yaml
 annotations:
@@ -309,13 +311,15 @@ annotations:
 Example `functions/pat.yaml`:
 
 ```yaml
-apiVersion: pkg.crossplane.io/v1beta1
-kind: FunctionRuntime
+apiVersion: pkg.crossplane.io/v1
+kind: Function
 metadata:
   name: function-patch-and-transform
 spec:
-  type: Development
+  package: xpkg.upbound.io/crossplane-contrib/function-patch-and-transform:v0.10.4
 ```
+
+`crossplane render` pulls the function package via Docker on first run. To use a locally running function process instead (e.g. for development), add `render.crossplane.io/runtime: Development` to the Function's annotations and run the function on `localhost:9443`.
 
 ---
 

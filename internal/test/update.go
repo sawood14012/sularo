@@ -57,16 +57,18 @@ func render(c Case) ([]byte, error) {
 		}
 	}
 
-	// crossplane render <xr> <composition> [--function-runtime-configs <functions>]
 	args := []string{"render", c.XR, c.Composition}
 	if c.Functions != "" {
 		if _, err := os.Stat(c.Functions); err != nil {
 			return nil, fmt.Errorf("missing functions file: %s", c.Functions)
 		}
-		args = append(args, "--function-runtime-configs", c.Functions)
+		args = append(args, c.Functions)
 	}
 
 	cmd := exec.Command("crossplane", args...)
+	if extra := dockerHostEnv(); extra != "" {
+		cmd.Env = append(os.Environ(), extra)
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
